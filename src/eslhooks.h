@@ -158,10 +158,10 @@ namespace eslhooks
 
 			static RE::TESForm* GetFormFromFile(RE::TESFile* a_file, RE::FormID a_rawID)
 			{
-				logger::debug("GetFormFromFile called for {} ,{:x}", a_file->filename, a_rawID);
 				auto formID = a_rawID;
 				AdjustFormIDFileIndex(a_file, formID);
-				logger::debug("GetFormFromFile formID looking up {:x}", formID);
+				logger::debug("GetFormFromFile called for {} ,{:08X} -> {:08X}", a_file->filename, a_rawID, formID);
+				//if (a_rawID != formID) logger::debug("GetFormFromFile formID looking up {:08X}", formID);
 				return RE::TESForm::GetFormByID(formID);
 			}
 
