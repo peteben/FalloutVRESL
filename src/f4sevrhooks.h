@@ -219,9 +219,9 @@ namespace F4SEVRHooks
 			return false;
 		}
 
-		static void Install(std::uintptr_t a_base)
+		static void Install(std::uintptr_t a_base, uint32_t offset)
 		{
-			std::uintptr_t target = a_base + 0x61e40;
+			std::uintptr_t target = a_base + offset;
 			auto jmp = TrampolineJmp((std::uintptr_t)ResolveFormId);
 			REL::safe_write(target, jmp.getCode(), jmp.getSize());
 		}
@@ -253,9 +253,9 @@ namespace F4SEVRHooks
 			return false;
 		}
 
-		static void Install(std::uintptr_t a_base)
+		static void Install(std::uintptr_t a_base, uint32_t offset)
 		{
-			std::uintptr_t target = a_base + 0x61ee0;
+			std::uintptr_t target = a_base + offset;
 			auto jmp = TrampolineJmp((std::uintptr_t)ResolveHandle);
 			REL::safe_write(target, jmp.getCode(), jmp.getSize());
 		}
@@ -362,7 +362,7 @@ namespace F4SEVRHooks
 		void* function;
 	};
 
-	std::vector<F4SEVRPatches> patches{
+	std::vector<F4SEVRPatches> patches{							// F4SEVR 0.6.21
 		{ "SaveModList", 0x18680, SavePluginsList },
 		{ "LoadModList", 0x184e0, LoadModList },
 		{ "LoadLightModList", 0x18750, LoadLightModList },
@@ -370,12 +370,14 @@ namespace F4SEVRHooks
 	void Install(std::uint32_t a_f4se_version)
 	{
 		auto f4sevr_base = reinterpret_cast<uintptr_t>(GetModuleHandleA("f4sevr_1_2_72"));
-		if (a_f4se_version == 393536) {  //0.6.21  // TODO fix up number
+		if (a_f4se_version == 393536 || a_f4se_version == 393552) {			// 0.6.20 or 0.6.21
 			logger::info("Found patchable f4sevr_1_2_72.dll version {} with base {:x}", a_f4se_version, f4sevr_base);
 		} else {
 			logger::info("Found unknown f4sevr_1_2_72.dll version {} with base {:x}; not patching", a_f4se_version, f4sevr_base);
 			return;
 		}
+
+		bool is_v621 = (a_f4se_version == 393552);					// F4SEVR 0.6.21 has a different offset for some functions
 
 		for (const auto& patch : patches) {
 			logger::info("Trying to patch {} at {:x} with {:x}"sv, patch.name, f4sevr_base + patch.offset, (std::uintptr_t)patch.function);
@@ -396,7 +398,7 @@ namespace F4SEVRHooks
 
 		Core_LoadCallback_Switch::Install(f4sevr_base, F4SEVRTrampoline);
 		Core_RevertCallbackHook::Install(f4sevr_base, F4SEVRTrampoline);
-		ResolveFormIdHook::Install(f4sevr_base);
-		ResolveHandleHook::Install(f4sevr_base);
+		ResolveFormIdHook::Install(f4sevr_base, is_v621 ? 0x61e50 : 0x61e40);
+		ResolveHandleHook::Install(f4sevr_base, is_v621 ?  0x61ef0 : 0x61ee0);
 	}
 }
