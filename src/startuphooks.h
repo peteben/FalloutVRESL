@@ -426,10 +426,11 @@ namespace startuphooks
 			static bool IsFilenameAPlugin(const char* a_fileName)
 			{
 				auto string = std::string(a_fileName);
-				logger::info("IsFilenameAPlugin Checking {}", string);
 				std::transform(string.begin(), string.end(), string.begin(), ::tolower);
-				logger::info("IsFilenameAPlugin return {}", string.ends_with(".esl") || string.ends_with(".esm") || string.ends_with(".esp"));
-				return !(string.ends_with(".esl") || string.ends_with(".esm") || string.ends_with(".esp"));
+				bool isAplugin = string.ends_with(".esl") || string.ends_with(".esm") || string.ends_with(".esp");
+
+				if (isAplugin) logger::info("IsFilenameAPlugin return {} : {}", string, isAplugin);
+				return !isAplugin;
 			}
 
 			static void Install()
