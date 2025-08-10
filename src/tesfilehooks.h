@@ -82,6 +82,29 @@ namespace tesfilehooks
 		}
 	};
 
+	struct GetModNamesHook {		// TODO: Check for loaded mod count > 256
+		static void Install() {
+			REL::Relocation<std::uintptr_t> target{ REL::Offset(0x02f1cd0) };		// Unused in game code, writing mod names to 'sharedplayer.dat'
+			F4SE::GetTrampoline().write_call<5>(target.address() + 0x45, GetLoadedModCountSE);
+			F4SE::GetTrampoline().write_call<5>(target.address() + 0x9a, GetModAtIndex);
+			REL::safe_fill(target.address() + 0x50, 0x89 ,1);					// Change 'MOV [CX], AL' to: 'MOV [CX], EAX' to preserve high byte
+
+			logger::info("Installed GetModNames hook");
+			}
+
+		};
+
+	struct BuildStatsMapHook {
+		static void Install() {
+			REL::Relocation<std::uintptr_t> target{ REL::Offset(0x0d4a880) };
+			F4SE::GetTrampoline().write_call<5>(target.address() + 0x251, GetModAtIndex);
+
+			logger::info("Installed BuildStatsMap hook");
+			}
+
+		};
+
+
 	struct UnkTerrainHook
 	{
 		static std::uint32_t thunk()
@@ -103,6 +126,7 @@ namespace tesfilehooks
 
 	struct UnkCOCHook
 	{
+		// GetExtCellDataFromFileByEditorID()
 		static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x011acc0) };  // Skyrim 0x17c000
 
 		static inline std::uint32_t fileIndexCount = 0;
@@ -185,7 +209,7 @@ namespace tesfilehooks
 			// NOP all the logic
 
 			// TODO: We should properly handle "optmized" TESFile cases
-			std::uintptr_t start = target.address() + 0xE4;  // 0x93
+			std::uintptr_t start = target.address() + 0xE4;  // 0x9e
 			std::uintptr_t end = target.address() + 0x127;   // 0x16d
 			REL::safe_fill(start, REL::NOP, end - start);
 		}
@@ -204,7 +228,7 @@ namespace tesfilehooks
 			//F4SE::AllocTrampoline(14);
 			trampoline.write_branch<5>(start, (std::uintptr_t)result);
 		}
-
+		;
 		static void InstallFailOpenFileLoop()
 		{
 			std::uintptr_t start = target.address() + 0x420;   // 0x439
@@ -299,9 +323,12 @@ namespace tesfilehooks
 		static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x017f700) };  // 0x1B9E60
 		static inline REL::Relocation<std::uintptr_t> target2{ REL::Offset(0x017f4d0) };  // 0x1b9c50
 		static inline REL::Relocation<std::uintptr_t> target3{ REL::Offset(0x05fdee0) };  
-		static inline REL::Relocation<std::uintptr_t> target4{ REL::Offset(0x0c09e80) };  
+		static inline REL::Relocation<std::uintptr_t> target4{ REL::Offset(0x0c09e80) };  // Workshop::GetWorkshopMenuNodeOriginFileIndex
 
-		static std::uint64_t thunk(RE::FormID a_formID)
+		static inline REL::Relocation<std::uintptr_t> target5{ REL::Offset(0x017fce0) };	// Unused in game code
+		static inline REL::Relocation<std::uintptr_t> target6{ REL::Offset(0x0c09ff0) };
+
+		static std::uint64_t thunk(RE::FormID a_formID)				// Fix for GetFileForTempID	
 		{
 			auto highestByte = a_formID >> 0x18;
 			logger::info("Calling Unk with {:x}", highestByte);
@@ -312,20 +339,21 @@ namespace tesfilehooks
 
 		static RE::TESFile* GetFileFromFormID(DataHandler* a_handler, RE::FormID a_formID)
 		{
-			logger::debug("GetFileFromFormID called on {:x}", a_formID);
+			//logger::debug("GetFileFromFormID called on {:08X}", a_formID);
 			auto espIndex = a_formID >> 0x18;
 			if (espIndex == 0xFE) {
-				auto eslIndex = (a_formID >> 0x12) & 0xFFF;
+				auto eslIndex = (a_formID >> 12) & 0xFFF;
 				if (eslIndex < a_handler->compiledFileCollection.smallFiles.size()) {
 					return a_handler->compiledFileCollection.smallFiles[eslIndex];
 				}
 			} else if (espIndex < a_handler->compiledFileCollection.files.size()) {
 				return a_handler->compiledFileCollection.files[espIndex];
 			}
+			logger::warn("GetFileFrom FormID returning NULL : {:08X}", a_formID);
 			return nullptr;
 		}
 
-		static void EraseBitShift()
+		static void EraseBitShift()							// Remove the bit shift, allowing entire FormID to be passed to GetFileFrom FormID()
 		{
 			std::uintptr_t start = target.address() + 0x52;
 			std::uintptr_t end = target.address() + 0x55;
@@ -342,21 +370,38 @@ namespace tesfilehooks
 			start = target4.address() + 0xB4;
 			end = target4.address() + 0xB7;
 			REL::safe_fill(start, REL::NOP, end - start);
-		}
 
-		static void InstallThunkUnk()
-		{
+			start = target4.address() + 0x33;
+			end = target4.address() + 0x36;
+			REL::safe_fill(start, REL::NOP, end - start);
+
+			start = target5.address() + 0x2b;
+			end = target5.address() + 0x2e;
+			REL::safe_fill(start, REL::NOP, end - start);
+
+			start = target6.address() + 0x1c;
+			end = target6.address() + 0x1f;
+			REL::safe_fill(start, REL::NOP, end - start);
+			}
+
+		static void InstallThunkUnk()				// Patch call to TESFile::GetFileForTempID()
+			{
 			pstl::write_thunk_call<UnkHook>(target.address() + 0x5B);
 			pstl::write_thunk_call<UnkHook>(target2.address() + 0x50);
-		}
+			pstl::write_thunk_call<UnkHook>(target5.address() + 0x34);			// 
+			}
 
 		static void InstallGetFileFromFormID()
 		{
 			F4SE::GetTrampoline().write_call<5>(target.address() + 0x71, GetFileFromFormID);
 			F4SE::GetTrampoline().write_call<5>(target2.address() + 0x66, GetFileFromFormID);
 			F4SE::GetTrampoline().write_call<5>(target3.address() + 0xE0, GetFileFromFormID);
+			F4SE::GetTrampoline().write_call<5>(target4.address() + 0x38, GetFileFromFormID);
 			F4SE::GetTrampoline().write_call<5>(target4.address() + 0xB7, GetFileFromFormID);
-		}
+			F4SE::GetTrampoline().write_call<5>(target5.address() + 0x47, GetFileFromFormID);			// 17fd27
+			F4SE::GetTrampoline().write_call<5>(target6.address() + 0x1f, GetFileFromFormID);
+
+			}
 
 		static void Install()
 		{
@@ -367,21 +412,22 @@ namespace tesfilehooks
 	};
 
 	struct DuplicateHook
-	{
-		static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x18F060) };  // 0x18f060
+	{	// TESFile::GetDuplicateFile()
+		static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x1397a0) };  // 0x18f060(Skyrim VR)
 
 		struct TrampolineCall : Xbyak::CodeGenerator
 		{
 			TrampolineCall(std::uintptr_t jmpAfterCall, std::uintptr_t func)
 			{
 				Xbyak::Label funcLabel;
-				mov(rcx, rsi);
-				mov(rdx, rdi);
+				mov(rcx, rbp);							// TESFile *original
+				mov(rdx, rdi);							// TESFile *duplicate
 				sub(rsp, 0x20);
-				call(ptr[rip + funcLabel]);
+				call(ptr[rip + funcLabel]);				// call our function below
 				add(rsp, 0x20);
-				mov(rcx, jmpAfterCall);
-				jmp(rcx);
+				mov(rcx, ptr[rdi + 0x50]);				// restore rcx
+				mov(rdx, jmpAfterCall);
+				jmp(rdx);
 				L(funcLabel);
 				dq(func);
 			}
@@ -397,11 +443,12 @@ namespace tesfilehooks
 			} else {
 				a_duplicate->flags.reset(RE::TESFile::RecordFlag::kMaster);
 			}
-//  FIX THIS BELOW
-			//a_duplicate->flags &= 0xFFFFFFu;
-			//a_duplicate->flags |= a_orig->compileIndex << 24;
+
 			a_duplicate->compileIndex = a_orig->compileIndex;
+			// Insert compileIndex into nextFormID
+			a_duplicate->fileHeaderInfo.nextFormID = (a_duplicate->fileHeaderInfo.nextFormID & 0xffffff) | (a_orig->compileIndex << 24);
 			// End of VR logic copy
+
 			a_duplicate->smallFileCompileIndex = a_orig->smallFileCompileIndex;
 
 			logger::debug("Successfully copied duplicate file {}, ESL flagged: {}", a_duplicate->filename, a_duplicate->IsLight());
@@ -411,14 +458,18 @@ namespace tesfilehooks
 		static inline void Install()
 		{
 			std::uintptr_t start = target.address() + 0x117;   // 0xfc
-			std::uintptr_t end = target.address() + 0x16f;     // 0x137
+			std::uintptr_t end = target.address() + 0x159;     // 0x137
 			REL::safe_fill(start, REL::NOP, end - start);
 			auto trampolineJmp = TrampolineCall(end, stl::unrestricted_cast<std::uintptr_t>(SetFlagsAndIndex));
-			REL::safe_write(start, trampolineJmp.getCode(), trampolineJmp.getSize());
 
-			if (trampolineJmp.getSize() > (end - start)) {
+			logger::debug("Trampoline size {}, end-start {}", trampolineJmp.getSize(), (end - start));
+
+			if (trampolineJmp.getSize() <= (end - start)) {
+				REL::safe_write(start, trampolineJmp.getCode(), trampolineJmp.getSize());
+				}
+			else {
 				logger::critical("DuplicateHook trampoline hook {} bytes too big!", trampolineJmp.getSize() - (end - start));
-			}
+				}
 		}
 	};
 
@@ -476,6 +527,16 @@ namespace tesfilehooks
 		}
 	};
 
+	struct versionPatch {
+		static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x0137040) };	// TESFile::SetDependenciesChecked
+
+		static void install() {
+			REL::safe_fill(target.address() + 0x45, REL::NOP, 6);			// Remove test for version > 0.95
+			}
+
+
+		};
+
 	static inline void InstallHooks()
 	{
 		DuplicateHook::Install();
@@ -488,5 +549,8 @@ namespace tesfilehooks
 		UnkCOCHook::Install();
 		UnkCOCFileResetHook::Install();
 		UnkHook::Install();
+		GetModNamesHook::Install();
+		BuildStatsMapHook::Install();
+		versionPatch::install();
 	}
 }
