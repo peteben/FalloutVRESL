@@ -532,6 +532,7 @@ namespace tesfilehooks
 
 		static void install() {
 			REL::safe_fill(target.address() + 0x45, REL::NOP, 6);			// Remove test for version > 0.95
+			REL::safe_fill(target.address() + 0xAB, REL::NOP, 2);			// Remove test for version > 0.95
 			}
 
 
