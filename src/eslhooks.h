@@ -158,11 +158,18 @@ namespace eslhooks
 
 			static RE::TESForm* GetFormFromFile(RE::TESFile* a_file, RE::FormID a_rawID)
 			{
+				static RE::FormID lastFormID;
 				auto formID = a_rawID;
+
 				AdjustFormIDFileIndex(a_file, formID);
-				logger::debug("GetFormFromFile called for {} ,{:08X} -> {:08X}", a_file->filename, a_rawID, formID);
-				//if (a_rawID != formID) logger::debug("GetFormFromFile formID looking up {:08X}", formID);
-				return RE::TESForm::GetFormByID(formID);
+				RE::TESForm* retForm = RE::TESForm::GetFormByID(formID);
+
+				if (lastFormID != formID) {						// Less spam
+					logger::debug("GetFormFromFile called for type {} {} ,{:08X} -> {:08X}", retForm->GetFormTypeString()
+						, a_file->filename, a_rawID, formID);
+					}
+				lastFormID = formID;
+				return retForm;
 			}
 
 			static void Install()
@@ -171,6 +178,7 @@ namespace eslhooks
 				std::uintptr_t end = target.address() + 0x5F;    // 0x6b
 				REL::safe_fill(start, REL::NOP, end - start);
 
+				end += 2;		// JMP Over XOR EAX,EAX
 				auto trampolineJmp = TrampolineCall(end, stl::unrestricted_cast<std::uintptr_t>(GetFormFromFile));
 				auto& trampoline = F4SE::GetTrampoline();
 				//F4SE::AllocTrampoline(trampolineJmp.getSize());
