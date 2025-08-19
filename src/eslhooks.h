@@ -136,7 +136,7 @@ namespace eslhooks
 		}
 
 		struct PapyrusGetFormFromFileHook
-		{
+		{	// GetFormFromFile
 			static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x1445d20) };  // Skyrim 0x9ACCA0
 
 			struct TrampolineCall : Xbyak::CodeGenerator
@@ -160,6 +160,11 @@ namespace eslhooks
 			{
 				static RE::FormID lastFormID;
 				auto formID = a_rawID;
+
+				if (a_rawID == 0) {
+					logger::warn("Called GetFormFromFile with NULL! File {}", a_file->filename);
+					return nullptr;
+					}
 
 				AdjustFormIDFileIndex(a_file, formID);
 				RE::TESForm* retForm = RE::TESForm::GetFormByID(formID);
@@ -260,7 +265,7 @@ namespace eslhooks
 		};
 
 		struct UnkDataHandlerWorldspaceFormLookupHook
-		{
+		{		// TESDataHandler::GetExtCellDataFromFileByEditorID
 			static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x011acc0) };  // 0x17c000
 
 			struct TrampolineCall : Xbyak::CodeGenerator
@@ -269,7 +274,7 @@ namespace eslhooks
 				{
 					Xbyak::Label funcLabel;
 					mov(rcx, rax);
-					mov(edx, edi);
+					mov(edx, esi);
 					sub(rsp, 0x20);
 					call(ptr[rip + funcLabel]);
 					add(rsp, 0x20);
@@ -284,6 +289,7 @@ namespace eslhooks
 			static RE::FormID AdjustFormID(RE::TESFile* a_file, RE::FormID a_rawID)
 			{
 				auto formID = a_rawID;
+				logger::debug("AdjustFormID {:08X}", formID);
 				AdjustFormIDFileIndex(a_file, formID);
 				return formID;
 			}
