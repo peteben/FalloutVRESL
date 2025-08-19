@@ -81,7 +81,7 @@ namespace startuphooks
 			return AddFile(a_file);
 		}
 
-		static void Install()
+		static void Install()		//Ok
 		{
 			REL::Relocation<std::uintptr_t> target{ REL::Offset(0x011d590) };  // Skyrim was 0x17dff0
 
@@ -101,6 +101,7 @@ namespace startuphooks
 			TrampolineCall(std::uintptr_t jmpAfterCall, std::uintptr_t func = stl::unrestricted_cast<std::uintptr_t>(AddFile))
 			{
 				Xbyak::Label funcLabel;
+				// mov(rcx,R13) ?
 				sub(rsp, 0x20);
 				call(ptr[rip + funcLabel]);
 				add(rsp, 0x20);
@@ -125,37 +126,37 @@ namespace startuphooks
 		}
 	};
 
-	struct AddTESFileHook2
-	{
-		struct TrampolineCall : Xbyak::CodeGenerator
-		{
-			// Call AddFile method, then jump back to rest of code
-			TrampolineCall(std::uintptr_t jmpAfterCall, std::uintptr_t func = stl::unrestricted_cast<std::uintptr_t>(AddFile))
-			{
-				Xbyak::Label funcLabel;
-				sub(rsp, 0x20);
-				call(ptr[rip + funcLabel]);
-				add(rsp, 0x20);
-				mov(rcx, jmpAfterCall);
-				jmp(rcx);
-				L(funcLabel);
-				dq(func);
-			}
-		};
+	//struct AddTESFileHook2				// Duplicate of AddTESFileHook1
+	//{
+	//	struct TrampolineCall : Xbyak::CodeGenerator
+	//	{
+	//		// Call AddFile method, then jump back to rest of code
+	//		TrampolineCall(std::uintptr_t jmpAfterCall, std::uintptr_t func = stl::unrestricted_cast<std::uintptr_t>(AddFile))
+	//		{
+	//			Xbyak::Label funcLabel;
+	//			sub(rsp, 0x20);
+	//			call(ptr[rip + funcLabel]);
+	//			add(rsp, 0x20);
+	//			mov(rcx, jmpAfterCall);
+	//			jmp(rcx);
+	//			L(funcLabel);
+	//			dq(func);
+	//		}
+	//	};
 
-		static void Install()
-		{
-			REL::Relocation<std::uintptr_t> target{ REL::Offset(0x0123490 + 0x9b5) };
-			REL::Relocation<std::uintptr_t> jmp{ REL::Offset(0x0123490 + 0x9F4) };
-			REL::safe_fill(target.address(), REL::NOP, jmp.address() - target.address());
+	//	static void Install()
+	//	{
+	//		REL::Relocation<std::uintptr_t> target{ REL::Offset(0x0123490 + 0x9b5) };
+	//		REL::Relocation<std::uintptr_t> jmp{ REL::Offset(0x0123490 + 0x9F4) };
+	//		REL::safe_fill(target.address(), REL::NOP, jmp.address() - target.address());
 
-			auto trampolineJmp = TrampolineCall(jmp.address());
-			REL::safe_write(target.address(), trampolineJmp.getCode(), trampolineJmp.getSize());
+	//		auto trampolineJmp = TrampolineCall(jmp.address());
+	//		REL::safe_write(target.address(), trampolineJmp.getCode(), trampolineJmp.getSize());
 
-			logger::info("Install AddFile1 hook at address {:x}", target.address());
-			logger::info("Install AddFile1 hook at offset {:x}", target.offset());
-		}
-	};
+	//		logger::info("Install AddFile1 hook at address {:x}", target.address());
+	//		logger::info("Install AddFile1 hook at offset {:x}", target.offset());
+	//	}
+	//};
 
 	struct CompileFilesHook
 	{
@@ -206,7 +207,7 @@ namespace startuphooks
 #endif
 		}
 
-		static void InstallAddFile()
+		static void InstallAddFile()			// Ok
 		{
 			std::uintptr_t start = target.address() + 0x387; // 0x196
 			std::uintptr_t end = target.address() + 0x3AA;   // 0x1b9
@@ -224,7 +225,7 @@ namespace startuphooks
 			logger::info("Install LoadFilesHook hook at address {:x}", start);
 		}
 
-		static void InstallAddFile2()
+		static void InstallAddFile2()			// Ok
 		{
 			std::uintptr_t start = target.address() + 0x3CD;   // 0x1f0
 			std::uintptr_t end = target.address() + 0x3F4;     // 0x217
@@ -250,16 +251,18 @@ namespace startuphooks
 				logger::info("OpenTESLoop opening file! {} {:x}", std::string(file->filename), file->compileIndex);
 				file->OpenTES(RE::NiFile::OpenMode::kReadOnly, 0);
 				//*totalForms += file->unk430;   // ************ FIX
-			}
+				totalForms += file->fileHeaderInfo.formCount;		// Fixed
+				}
 			for (auto file : handler->compiledFileCollection.smallFiles) {
 				logger::info("OpenTESLoop opening small file! {} {:x}", std::string(file->filename), file->compileIndex);
 				file->OpenTES(RE::NiFile::OpenMode::kReadOnly, 0);
 				//*totalForms += file->unk430;   // *************** FIX
-			}
+				totalForms += file->fileHeaderInfo.formCount;		// Fixed
+				}
 			logger::info("OpenTESLoop finished!");
 		}
 
-		static void InstallOpenTESLoop()
+		static void InstallOpenTESLoop()			// Ok
 		{
 			std::uintptr_t start = target.address() + 0x3FB;  // 0x21d
 			std::uintptr_t end = target.address() + 0x448;    // 0x268
@@ -307,7 +310,7 @@ namespace startuphooks
 			logger::info("ConstructObjectListThunk finished!");
 		}
 
-		static void InstallConstructObjectListLoop()
+		static void InstallConstructObjectListLoop()		//Ok
 		{
 			std::uintptr_t start = target.address() + 0x475;   // 0x29c
 			std::uintptr_t end = target.address() + 0x4A6;     // 0x2d2
@@ -362,18 +365,18 @@ namespace startuphooks
 
 			static inline REL::Relocation<decltype(thunk)> func;
 
-			static void Install()
+			static void Install()	//Ok
 			{
 				REL::Relocation<std::uintptr_t> target{ REL::Offset(0x1BD9CD0 + 0x1ED) };  // 0xC70FB0 + 0x1ED
 				pstl::write_thunk_call<ParsePluginTXTHook>(target.address());
-				REL::safe_fill(target.address(), REL::NOP, 0x100);
+				//REL::safe_fill(target.address(), REL::NOP, 0x100);						// Overwriting the thunk?!
 				logger::info("Hooked PluginParsing at {:x}", target.address());
 				logger::info("Hooked PluginParsing at offset {:x}", target.offset());
 			}
 		};
 
-		struct PrepareBSAHook
-		{
+		struct PrepareBSAHook		// Ok
+		{	// RegisterBaseArchivesForFile
 			static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x0124c30) };  // 0x184360
 
 			static void Install()
@@ -387,7 +390,7 @@ namespace startuphooks
 			}
 		};
 
-		struct UnkUIModHook
+		struct UnkUIModHook		// Ok
 		{
 			static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x0b76c10) };  // 0x52D230
 
@@ -402,8 +405,8 @@ namespace startuphooks
 			}
 		};
 
-		struct BuildFileListHook
-		{
+		struct BuildFileListHook			// Ok
+		{		// FindAndInsertFiles
 			static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x011dcd0) };  // 0x17e540
 
 			struct TrampolineCall : Xbyak::CodeGenerator
@@ -411,7 +414,7 @@ namespace startuphooks
 				TrampolineCall(std::uintptr_t jmpAfterCall, std::uintptr_t func)
 				{
 					Xbyak::Label funcLabel;
-					lea(rcx, ptr[rbp + 0x8C]);  // Move fileName into place
+					lea(rcx, ptr[rbp + 0x8C]);			// Move fileName into place
 					sub(rsp, 0x20);
 					call(ptr[rip + funcLabel]);
 					add(rsp, 0x20);
@@ -529,7 +532,7 @@ namespace startuphooks
 	{
 		AddTESFileHook::Install();
 		AddTESFileHook1::Install();
-		AddTESFileHook2::Install();
+		//AddTESFileHook2::Install();
 		CompileFilesHook::Install();
 		eslExtensionHooks::InstallHooks();
 	}
