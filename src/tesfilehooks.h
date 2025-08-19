@@ -530,12 +530,32 @@ namespace tesfilehooks
 	struct versionPatch {
 		static inline REL::Relocation<std::uintptr_t> target{ REL::Offset(0x0137040) };	// TESFile::SetDependenciesChecked
 
+		struct TrampolinePatch1 : Xbyak::CodeGenerator {
+			TrampolinePatch1() {
+				movss(ptr[rsi + 0x328], xmm6);
+				nop(5);
+				}
+			};
+		struct TrampolinePatch2 : Xbyak::CodeGenerator {
+			TrampolinePatch2() {
+				movss(ptr[rcx + 0x328], xmm6);
+				nop();
+				}
+			};
+
+
+
 		static void install() {
+			auto trampoline_patch1 = new TrampolinePatch1();
+			auto trampoline_patch2 = new TrampolinePatch2();
+
+			//Overwrite version in File header
+			//REL::safe_write(target.address() + 0x3E, trampoline_patch1->getCode(), trampoline_patch1->getSize());
+			//REL::safe_write(target.address() + 0xA4, trampoline_patch2->getCode(), trampoline_patch2->getSize());
+
 			REL::safe_fill(target.address() + 0x45, REL::NOP, 6);			// Remove test for version > 0.95
 			REL::safe_fill(target.address() + 0xAB, REL::NOP, 2);			// Remove test for version > 0.95
 			}
-
-
 		};
 
 	static inline void InstallHooks()
